@@ -39,7 +39,7 @@ def apiSynoLogout(account, passwd, apiSynoUrl):
     print(logoutResponse.json())
 
 
-# Retrive all sirens contained in the various SIREN.txt files
+# Retrive all sirens contained in the various SIREN.txt files from SynoCloud
 def getSiren():
     txtPathSirenList = {}
     with open("./pattern.yml", "rt", encoding="utf-8") as file:
@@ -77,7 +77,7 @@ def getSiren():
                 sirenList.append(ReadSirenResponse.text)
 
 
-# Récupération de tous les paths/noms fichiers
+# Récupération de tous les paths/noms fichiers from SynoCloud
 def getDataInfo():
     indice = 0
     with open("./pattern.yml", "rt", encoding="utf-8") as file:

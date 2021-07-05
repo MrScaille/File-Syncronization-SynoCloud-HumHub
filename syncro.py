@@ -39,15 +39,14 @@ def apiSynoLogout(account, passwd, apiSynoUrl):
     print(logoutResponse.json())
 
 
-# Récupération de tous les SIREN
+# Retrive all sirens contained in the various SIREN.txt files
 def getSiren():
     txtPathSirenList = {}
     with open("./pattern.yml", "rt", encoding="utf-8") as file:
         ymlFile = yaml.full_load(file)
-        # On récupère dans le yml le dictionnaire Siren et on boucle dedans pour chaque chemin
+        # Read in the yml file the Siren dictionary for the path that contains all the folders of the communities
         for WildcardsPath in ymlFile["Siren"]:
-            #
-            txtPathSirenList = glob.glob(WildcardsPath)
+            # Query to search all the SIREN.txt files path
             taskUrl = (
                 apiSynoUrl
                 + "/entry.cgi?api=SYNO.FileStation.Search&version=2&method=start&pattern=SIREN.txt&folder_path="
@@ -56,6 +55,7 @@ def getSiren():
                 + sidToken
             )
             taskResponse = requests.request("GET", taskUrl, verify=False)
+            # Query to get the result of the preveious one
             listPathUrl = (
                 "/entry.cgi?api=SYNO.FileStation.Search&version=2&method=list&taskid="
                 + taskResponse.json()["data"]["taskid"]
@@ -65,7 +65,7 @@ def getSiren():
             listPathResponse = requests.request("GET", listPathUrl, verify=False)
             for path in listPathResponse.json()["data"]["files"]:
                 txtPathSirenList.append(path["path"])
-            # Il faut lire les tous les SIREN.txt des paths et mettre les rien dans sirenList
+            # Query to read all the SIREN.txt files with the paths retrieved just before and put the sirens in sirenList
             for txtPath in txtPathSirenList:
                 ReadSirenUrl = (
                     "entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path="
@@ -73,7 +73,6 @@ def getSiren():
                     + "&mode=open&_sid="
                     + sidToken
                 )
-                # La liste de path est utilisée pour ouvrir les txt et les mettre dans SirenList
                 ReadSirenResponse = requests.request("GET", ReadSirenUrl, verify=False)
                 sirenList.append(ReadSirenResponse.text)
 

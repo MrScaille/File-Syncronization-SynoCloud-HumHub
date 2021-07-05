@@ -1,9 +1,9 @@
 #Ignore private information
-*.yaml
+*.yml
 *.ini
 SNC/
 PNM/
-test.python
+test.py
 test.txt
 
 # Byte-compiled / optimized / DLL files

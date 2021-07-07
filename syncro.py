@@ -1,12 +1,13 @@
 import yaml, os, glob, requests, json, configparser
 import urllib3
+import synology_api
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 config = configparser.ConfigParser()
 config.read("config.ini")
 
-sirenList = []
+nameAndSirenDict = {}
 dataNamePathDict = {}
 apiSynoUrl = config["CREDENTIALS"]["apiSynoUrl"]
 account = config["CREDENTIALS"]["account"]
@@ -39,61 +40,101 @@ def apiSynoLogout(account, passwd, apiSynoUrl):
     print(logoutResponse.json())
 
 
+def apiSynoSearch(apiSynoUrl, path, sid, pattern=None, extension=None):
+    taskUrl = (
+        apiSynoUrl
+        + "/entry.cgi?api=SYNO.FileStation.Search&version=2&method=start"
+        + "&folder_path="
+        + path
+        + "&_sid="
+        + sid
+    )
+
+    if pattern is not None and extension is None:
+        taskUrl = taskUrl + "&pattern=" + pattern
+    elif pattern is None and extension is not None:
+        taskUrl = taskUrl + "&extension=" + extension
+    elif pattern is not None and extension is not None:
+        taskUrl = taskUrl + "&pattern=" + pattern + "&extension=" + extension
+
+    taskResponse = requests.request("GET", taskUrl, verify=False)
+
+    taskResultUrl = (
+        apiSynoUrl
+        + '/entry.cgi?api=SYNO.FileStation.Search&version=2&method=list&taskid="'
+        + taskResponse.json()["data"]["taskid"]
+        + '"&_sid='
+        + sid
+    )
+    taskResult = requests.request("GET", taskResultUrl, verify=False)
+    return taskResult
+
+
 # Retrive all sirens contained in the various SIREN.txt files from SynoCloud
 def getSiren():
-    txtPathSirenList = {}
+    txtPathSirenList = []
     with open("./pattern.yml", "rt", encoding="utf-8") as file:
         ymlFile = yaml.full_load(file)
         # Read in the yml file the Siren dictionary for the path that contains all the folders of the communities
-        for WildcardsPath in ymlFile["Siren"]:
+        for wildcardsPath in ymlFile["Siren"]:
             # Query to search all the SIREN.txt files path
-            taskUrl = (
-                apiSynoUrl
-                + "/entry.cgi?api=SYNO.FileStation.Search&version=2&method=start&pattern=SIREN.txt&folder_path="
-                + WildcardsPath
-                + "&_sid="
-                + sidToken
+            listPathResponse = apiSynoSearch(
+                apiSynoUrl, wildcardsPath, sidToken, pattern="SIREN.txt"
             )
-            taskResponse = requests.request("GET", taskUrl, verify=False)
-            # Query to get the result of the preveious one
-            listPathUrl = (
-                "/entry.cgi?api=SYNO.FileStation.Search&version=2&method=list&taskid="
-                + taskResponse.json()["data"]["taskid"]
-                + "&_sid="
-                + sidToken
-            )
-            listPathResponse = requests.request("GET", listPathUrl, verify=False)
             for path in listPathResponse.json()["data"]["files"]:
                 txtPathSirenList.append(path["path"])
             # Query to read all the SIREN.txt files with the paths retrieved just before and put the sirens in sirenList
             for txtPath in txtPathSirenList:
                 ReadSirenUrl = (
-                    "entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path="
+                    apiSynoUrl
+                    + "/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path="
                     + txtPath
                     + "&mode=open&_sid="
                     + sidToken
                 )
                 ReadSirenResponse = requests.request("GET", ReadSirenUrl, verify=False)
-                sirenList.append(ReadSirenResponse.text)
+                nameAndSirenDict[
+                    os.path.basename(os.path.dirname(txtPath))
+                ] = ReadSirenResponse.text
 
 
 # Récupération de tous les paths/noms fichiers from SynoCloud
 def getDataInfo():
-    indice = 0
+    dataWildcardsPathList = []
     with open("./pattern.yml", "rt", encoding="utf-8") as file:
         yml = yaml.full_load(file)
         # On récupère dans le yml le dictionnaire Pattern et on boucle dedans pour chaque chemin
-        for WildcardsPatternPath in yml["Pattern"]:
+        for wildcardsPatternPath in yml["Pattern"]:
             # On récupère la liste des chemins en mettant les Siren
-            dataWildcardsPathList = glob.glob(
-                WildcardsPatternPath.replace("{{SIREN}}", sirenList[indice])
+            for name, siren in nameAndSirenDict.items():
+                if (
+                    "{{SIREN}}" in wildcardsPatternPath
+                    and "{{NameCT}}" in wildcardsPatternPath
+                ):
+                    dataWildcardsPathList.append(
+                        wildcardsPatternPath.replace("{{SIREN}}", siren).replace(
+                            "{{NomCT}}", name.rsplit("-").rstrip()
+                        )
+                    )
+
+                dataWildcardsPathList.append(
+                    wildcardsPatternPath.replace("{{SIREN}}", siren).replace(
+                        "{{NomCT}}", name
+                    )
+                )
+        for dataPath in dataWildcardsPathList:
+            response = apiSynoSearch(
+                apiSynoUrl,
+                os.path.dirname(dataPath),
+                sidToken,
+                pattern="*",
+                extension=os.path.basename(dataPath).replace("*.", ""),
             )
-            for dataPath in dataWildcardsPathList:
-                # On remplie un dict "dataName" : "dataPath" pour avoir la liste des noms et des chemins des fichiers
-                dataNamePathDict[
-                    os.path.basename(os.path.normpath(dataPath))
-                ] = dataPath
-            indice = +1
+            if response.json()["data"]["files"]:
+                for i in range(len(response.json()["data"]["files"])):
+                    dataNamePathDict[
+                        response.json()["data"]["files"][i]["name"]
+                    ] = response.json()["data"]["files"][i]["path"]
 
 
 # Vérification de l'existance (dans HumHub) ou non des fichiers récupéré avec getData, s'ils existent on supprime du dict
@@ -110,4 +151,8 @@ def uploadDataToHumHub():
 
 
 apiSynoLogin(account, passwd, apiSynoUrl)
+getSiren()
+print(nameAndSirenDict)
+getDataInfo()
+print(dataNamePathDict)
 apiSynoLogout(account, passwd, apiSynoUrl)

@@ -10,10 +10,10 @@ Folder tree of SynoCloud side :
 .
 └── X/
     ├── Communities/
-    │   ├── CommunitiesName1/
+    │   ├── CommunitiesName1 - Departmentnumber/
     │   │   ├── SIREN.txt
     │   │   └── ...
-    │   └── CommunitiesName2/
+    │   └── CommunitiesName2 - Departmentnumber/
     │       ├── SIREN.txt
     │       └── ...
     └── ...

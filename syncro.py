@@ -142,8 +142,22 @@ def isInHumHub():
     pass
 
 
-def downloadDataFromSyno():
-    pass
+def downloadFileFromSyno():
+    if not os.path.exists("tmpScriptSync"):
+        os.makedirs("tmpScriptSync")
+
+    for fileName, filePath in dataNamePathDict.items():
+        downlaodUrl = (
+            apiSynoUrl
+            + "/entry.cgi?api=SYNO.FileStation.Download&version=2&method=download&path="
+            + filePath
+            + "&mode=download&_sid="
+            + sidToken
+        )
+        response = requests.request("GET", downlaodUrl, verify=False)
+
+        with open("tmpScriptSync/" + fileName, "wb") as f:
+            f.write(response.content)
 
 
 def uploadDataToHumHub():
@@ -155,4 +169,5 @@ getSiren()
 print(nameAndSirenDict)
 getDataInfo()
 print(dataNamePathDict)
+downloadDataFromSyno()
 apiSynoLogout(account, passwd, apiSynoUrl)

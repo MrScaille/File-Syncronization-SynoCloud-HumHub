@@ -142,10 +142,12 @@ def isInHumHub():
     pass
 
 
+# Download to a temporary directory all files that are not in HumHub
 def downloadFileFromSyno():
+    # Create the temporary directory if it does not exist
     if not os.path.exists("tmpScriptSync"):
         os.makedirs("tmpScriptSync")
-
+    # Looping in the dict where there are file names and paths to download their contents
     for fileName, filePath in dataNamePathDict.items():
         downlaodUrl = (
             apiSynoUrl
@@ -155,7 +157,7 @@ def downloadFileFromSyno():
             + sidToken
         )
         response = requests.request("GET", downlaodUrl, verify=False)
-
+        # Copying the response contents of the actual file in file that has the same name
         with open("tmpScriptSync/" + fileName, "wb") as f:
             f.write(response.content)
 
